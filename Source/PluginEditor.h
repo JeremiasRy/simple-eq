@@ -33,6 +33,14 @@ struct RotarySliderWithLabels : juce::Slider
         setLookAndFeel(nullptr);
     }
 
+    struct LabelPos 
+    {
+        float pos;
+        juce::String label;
+    };
+
+    juce::Array<LabelPos> labels;
+
     void paint(juce::Graphics& g) override;
     juce::Rectangle<int> getSliderBounds() const;
     int getTextHeight() const { return 14; }
@@ -52,6 +60,7 @@ struct ResponseCurveComponent : juce::Component, juce::AudioProcessorParameter::
     void parameterGestureChanged(int parameterIdex, bool gestureIsStarting) override;
     void timerCallback() override;
     void paint(juce::Graphics& g) override;
+    void updateChain();
 
 private:
     SimpleeqAudioProcessor& audioProcessor;
