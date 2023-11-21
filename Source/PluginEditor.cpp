@@ -8,7 +8,9 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-ResponseCurveComponent::ResponseCurveComponent(SimpleeqAudioProcessor& p) : audioProcessor(p)
+ResponseCurveComponent::ResponseCurveComponent(SimpleeqAudioProcessor& p) :
+    audioProcessor(p),
+    leftChannelFifo(&audioProcessor.leftChannelFifo)
 {
     const auto& params = audioProcessor.getParameters();
 
@@ -16,6 +18,8 @@ ResponseCurveComponent::ResponseCurveComponent(SimpleeqAudioProcessor& p) : audi
     {
         param->addListener(this);
     }
+    leftChannelFFTDataGenerator.changeOrder(FFTOrder::order2048);
+    monoBuffer.setSize(1, leftChannelFFTDataGenerator.getFFTSize());
     updateChain();
     startTimerHz(60);
 }
@@ -35,6 +39,29 @@ void ResponseCurveComponent::parameterGestureChanged(int parameterIdex, bool ges
 
 void ResponseCurveComponent::timerCallback()
 {
+    juce::AudioBuffer<float> tempIncomingBuffer;
+
+    while(leftChannelFifo->getNumCompleteBuffersAvailable() > 0) 
+    {
+        if (leftChannelFifo->getAudioBuffer(tempIncomingBuffer)) 
+        {
+            auto size = tempIncomingBuffer.getNumSamples();
+
+            juce::FloatVectorOperations::copy(
+                monoBuffer.getWritePointer(0, 0),
+                monoBuffer.getReadPointer(0, size),
+                monoBuffer.getNumSamples() - size
+            );
+
+            juce::FloatVectorOperations::copy(
+                monoBuffer.getWritePointer(0, monoBuffer.getNumSamples() - size),
+                tempIncomingBuffer.getReadPointer(0, 0),
+                size
+            );
+        }
+
+        leftChannelFFTDataGenerator.produceFFTDataForRendering(monoBuffer, -48.f);
+    }
     if (parametersChanged.compareAndSetBool(false, true))
     {
         updateChain();
